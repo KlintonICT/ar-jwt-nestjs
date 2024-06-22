@@ -66,7 +66,7 @@ export class AuthService {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
     });
-    if (!user) {
+    if (!user || !user.hashedRt) {
       throw new ForbiddenException('Access Denied');
     }
 

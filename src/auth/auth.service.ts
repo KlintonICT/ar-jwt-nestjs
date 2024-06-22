@@ -3,7 +3,7 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 
 import { AuthDto } from './dto';
-import { TTokens } from './types';
+import { TTokens } from './types/index.type';
 
 import { PrismaService } from '@/prisma/prisma.service';
 
@@ -16,7 +16,6 @@ export class AuthService {
 
   async signupLocal(dto: AuthDto): Promise<TTokens> {
     const hash = await this.hashData(dto.password);
-
     const newUser = await this.prisma.user.create({
       data: {
         email: dto.email,
@@ -25,7 +24,6 @@ export class AuthService {
     });
 
     const tokens = await this.getTokens(newUser.id, newUser.email);
-
     await this.updateRtHash(newUser.id, tokens.refresh_token);
 
     return tokens;
@@ -35,19 +33,16 @@ export class AuthService {
     const user = await this.prisma.user.findUnique({
       where: { email: dto.email },
     });
-
     if (!user) {
       throw new ForbiddenException('Access Denied');
     }
 
     const passwordMatches = await bcrypt.compare(dto.password, user.hash);
-
     if (!passwordMatches) {
       throw new ForbiddenException('Access Denied');
     }
 
     const tokens = await this.getTokens(user.id, user.email);
-
     await this.updateRtHash(user.id, tokens.refresh_token);
 
     return tokens;
@@ -67,7 +62,24 @@ export class AuthService {
     });
   }
 
-  refreshTokens() {}
+  async refreshTokens(userId: number, rt: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+    if (!user) {
+      throw new ForbiddenException('Access Denied');
+    }
+
+    const rtMatches = await bcrypt.compare(rt, user.hashedRt);
+    if (!rtMatches) {
+      throw new ForbiddenException('Access Denied');
+    }
+
+    const tokens = await this.getTokens(user.id, user.email);
+    await this.updateRtHash(user.id, tokens.refresh_token);
+
+    return tokens;
+  }
 
   async updateRtHash(userId: number, refreshToken: string) {
     const hash = await this.hashData(refreshToken);
